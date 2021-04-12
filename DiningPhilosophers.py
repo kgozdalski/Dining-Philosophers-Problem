@@ -2,75 +2,84 @@ from threading import Thread, Lock
 import random
 import time
 
-liczbaFilozofow = 5
+numberOfPhilosophers = 5    # How many locks will be
+runningTime = 10            # Time in seconds
+printSwap = False           # True - print in console every lock swap
 
-class Filozof(Thread):
-    uruchomiony = True
+class Philosopher(Thread):
+    isRunning = True
 
-    def __init__(self,nr,lewyWidelec,prawyWidelec):
+    def __init__(self,nr,left,right):
         self.nr = nr
-        self.lewyWidelec = lewyWidelec
-        self.prawyWidelec = prawyWidelec
+        self.left = left
+        self.right = right
         super().__init__()
 
     def run(self):
-        while(self.uruchomiony):
-            time.sleep(random.uniform(1,5)) #Przerwa miedzy jedzeniem
-            print("Filozof #{} jest glodny".format(self.nr))
-            self.jedz()
+        while(self.isRunning):
+            time.sleep(random.uniform(1,5)) # Random break
+            print("Philosopher #{} is hungry".format(self.nr))
+            self.eat()
     
-    def jedz(self):
-        zamienione = False #Ktory widelec filozof wybiera jako pierwszy; False - lewy, True - prawy
-        w1, w2 = self.lewyWidelec, self.prawyWidelec
+    def eat(self):
+        isSwapped  = False # Which fork is selected first; False - left, True - right
+        fork_1, fork_2 = self.left, self.right
         while True:
-            czyZablokowanyw1 = w1.acquire(True,timeout=random.uniform(1,3)) 
-            if czyZablokowanyw1 == True:
-                if zamienione == False:
-                    print("Filozof #{} podnosi lewy widelec".format(self.nr))
-                else:
-                    print("Filozof #{} podnosi prawy widelec".format(self.nr))
-                czyZablokowanyw2 = w2.acquire(False) #Jeżeli nie może podniesc widelca zwraca False; jeżeli może - True i blokuje
-                if czyZablokowanyw2:
-                    if zamienione == False:
-                        print("Filozof #{} podnosi prawy widelec".format(self.nr))
+            isLocked_fork_1 = fork_1.acquire(True,timeout=random.uniform(1,3)) 
+            if isLocked_fork_1 == True:
+                if printSwap:
+                    if isSwapped == False:
+                        print("Philosopher #{} picks up left fork".format(self.nr))
                     else:
-                        print("Filozof #{} podnosi lewy widelec".format(self.nr))
-                    break
-                w1.release() #Jeżeli nie może podniesc drugiego widelca odklada pierwszy
-                if zamienione == False:
-                    print("Filozof #{} odklada lewy widelec".format(self.nr))
-                else:
-                    print("Filozof #{} odklada prawy widelec".format(self.nr))
+                        print("Philosopher #{} picks up right fork".format(self.nr))
 
-            print("Filozof #{} zamienia widelce".format(self.nr))
-            w1, w2 = w2, w1 #Zmiana kolejnosci podnoszenia widelcow
-            zamienione = not zamienione
+                isLocked_fork_2 = fork_2.acquire(False) # If philosopher can't pick up fork returns False, else True and locks
+
+                if printSwap:
+                    if isLocked_fork_2:
+                        if isSwapped == False:
+                            print("Philosopher #{} picks up right fork".format(self.nr))
+                        else:
+                            print("Philosopher #{} picks up left fork".format(self.nr))
+                break
+                fork_1.release() # If philosopher can't pick up second fork, he puts down first one and releases the lock
+                if printSwap:
+                    if isSwapped == False:
+                        print("Philosopher #{} puts left fork down".format(self.nr))
+                    else:
+                        print("Philosopher #{} puts right fork down".format(self.nr))
+
+            if printSwap:
+                print("Philosopher #{} swaps forks".format(self.nr))
+            fork_1, fork_2 = fork_2, fork_1 # Swap the order of picking up forks
+            isSwapped = not isSwapped
         
-        self.jedzenie()
+        self.eating()
         try:
-            w1.release()
-            w2.release()
+            fork_1.release()
+            fork_2.release()
         except RuntimeError:
             pass
 
-    def jedzenie(self):
-        print("Filozof #{} zaczyna jesc ####################".format(self.nr))
+    def eating(self):
+        print("Philosopher #{} starts eating".format(self.nr))
         time.sleep(random.uniform(3,5))
-        print("Filozof #{} kończy jesc --------------------".format(self.nr))
+        print("Philosopher #{} ends eating".format(self.nr))
     
-def main():
-    if int(liczbaFilozofow) < 2:
+def run():
+    if int(numberOfPhilosophers) < 2:
         exit()
-    widelce = [Lock() for i in range(liczbaFilozofow)]
+    forks = [Lock() for i in range(numberOfPhilosophers)]
 
-    filozofowie = [Filozof(i,widelce[(i)%liczbaFilozofow],widelce[(i+1)%liczbaFilozofow]) for i in range(liczbaFilozofow)]
+    philosophers = [Philosopher(i,forks[(i)%numberOfPhilosophers],forks[(i+1)%numberOfPhilosophers]) for i in range(numberOfPhilosophers)]
 
-    Filozof.uruchomiony = True
-    for f in filozofowie:
+    Philosopher.isRunning = True
+
+    for f in philosophers:
         f.start()
-    time.sleep(10) #Ustawienie czasu dzialania programu (kiedy filozofowie moga stac sie glodni)
-    Filozof.uruchomiony = False
-    print("Koniec dzialania")
 
-main()
+    time.sleep(runningTime)
+    Philosopher.isRunning = False
+
+run()
 
